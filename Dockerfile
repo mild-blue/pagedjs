@@ -1,4 +1,4 @@
-FROM mcr.microsoft.com/playwright:v1.20.0-focal
+FROM mcr.microsoft.com/playwright:v1.32.3-focal
 
 # Application parameters and variables
 ENV NODE_ENV=development
@@ -43,7 +43,7 @@ RUN apt-get update && \
 		apt-get install -y vim && \
 		rm -rf /var/lib/apt/lists/*
 
-RUN npm install npm@latest -g
+#RUN npm install npm@latest -g
 RUN npm install -g node-gyp
 
 RUN mkdir -p $DIRECTORY

@@ -1,4 +1,4 @@
-<img style="display: block; margin: 5em 0 auto;" src="https://www.pagedmedia.org/wp-content/uploads/2018/11/pagedjs.png" alt="Paged.js logo - pagination in the browser"/>
+<img style="display: block; margin: 5em 0 auto;" src="assets/pagedjs.png" alt="Paged.js logo - pagination in the browser"/>
 
 Paged.js - Paged Media Tools
 ===========
@@ -42,9 +42,9 @@ However, you can add an async `before` function or return a Promise to delay the
 <script>
 	window.PagedConfig = {
 		before: () => {
-			return new Promise(resolve, reject) {
+			return new Promise((resolve, reject) => {
 				setTimeout(() => { resolve() }, 1000);
-			}
+			})
 		},
 		after: (flow) => { console.log("after", flow) },
 	};
@@ -108,7 +108,7 @@ New handlers can be registered from `import { registerHandlers } from 'pagedjs'`
 </script>
 ```
 
-Handlers have methods that correspond to the hooks for the parsing, layout and rendering of the Chunker and Polisher. Returning an promise or `async` function from a method in a handler will complete that task before continuing with the other registered methods for that hook.
+Handlers have methods that correspond to the hooks for the parsing, layout and rendering of the Chunker and Polisher. Returning a promise or `async` function from a method in a handler will complete that task before continuing with the other registered methods for that hook.
 
 ```js
 // Previewer
@@ -120,7 +120,9 @@ beforeParsed(content)
 filter(content)
 afterParsed(parsed)
 beforePageLayout(page)
+onPageLayout(pageWrapper, breakToken, layout);
 afterPageLayout(pageElement, page, breakToken)
+finalizePage(pageElement, page, breakToken)
 afterRendered(pages)
 
 // Polisher
@@ -139,6 +141,7 @@ renderNode(node, sourceNode, layout)
 onOverflow(overflow, rendered, bounds)
 onBreakToken(breakToken, overflow, rendered)
 afterOverflowRemoved(removed, rendered)
+beforeRenderResult(breakToken, pageWrapper)
 ```
 
 ## Setup

@@ -6,6 +6,7 @@ import Queue from "../utils/queue.js";
 import {
 	requestIdleCallback
 } from "../utils/utils.js";
+import { OverflowContentError } from "./renderresult.js";
 
 const MAX_PAGES = false;
 const MAX_LAYOUTS = false;
@@ -99,13 +100,16 @@ class Chunker {
 		this.hooks.filter = new Hook(this);
 		this.hooks.afterParsed = new Hook(this);
 		this.hooks.beforePageLayout = new Hook(this);
+		this.hooks.onPageLayout = new Hook(this);
 		this.hooks.layout = new Hook(this);
 		this.hooks.renderNode = new Hook(this);
 		this.hooks.layoutNode = new Hook(this);
 		this.hooks.onOverflow = new Hook(this);
 		this.hooks.afterOverflowRemoved = new Hook(this);
 		this.hooks.onBreakToken = new Hook();
+		this.hooks.beforeRenderResult = new Hook(this);
 		this.hooks.afterPageLayout = new Hook(this);
+		this.hooks.finalizePage = new Hook(this);
 		this.hooks.afterRendered = new Hook(this);
 
 		this.pages = [];
@@ -321,12 +325,14 @@ class Chunker {
 			this.emit("page", page);
 			// await this.hooks.layout.trigger(page.element, page, undefined, this);
 			await this.hooks.afterPageLayout.trigger(page.element, page, undefined, this);
+			await this.hooks.finalizePage.trigger(page.element, page, undefined, this);
 			this.emit("renderedPage", page);
 		}
 	}
 
 	async *layout(content, startAt) {
 		let breakToken = startAt || false;
+		let page, prevPage;
 
 		while (breakToken !== undefined && (MAX_PAGES ? this.total < MAX_PAGES : true)) {
 
@@ -336,24 +342,42 @@ class Chunker {
 				await this.handleBreaks(content.firstChild);
 			}
 
-			let page = this.addPage();
+			// Don't add a page if we have a forced break now and we just
+			// did a break due to overflow but have nothing displayed on
+			// the current page.
+			if (page && breakToken.overflow.length &&
+				(
+					!page.area.childElementCount ||
+					!page.area.firstChild.getBoundingClientRect().height
+				)
+			) {
+				console.log("Suppress page break");
+			} else {
+				let page = this.addPage();
 
-			await this.hooks.beforePageLayout.trigger(page, content, breakToken, this);
-			this.emit("page", page);
+				await this.hooks.beforePageLayout.trigger(page, content, breakToken, this);
+				this.emit("page", page);
 
-			// Layout content in the page, starting from the breakToken
-			breakToken = await page.layout(content, breakToken, this.maxChars);
+				// Layout content in the page, starting from the breakToken
+				if (breakToken) {
+					// Debugging tool - ensures previously rendered content is visible.
+					// window.scrollTo(0, document.body.scrollHeight);
+				}
+				breakToken = await page.layout(content, breakToken, prevPage);
 
-			await this.hooks.afterPageLayout.trigger(page.element, page, breakToken, this);
-			this.emit("renderedPage", page);
+				await this.hooks.afterPageLayout.trigger(page.element, page, breakToken, this);
+				await this.hooks.finalizePage.trigger(page.element, page, undefined, this);
+				this.emit("renderedPage", page);
 
-			this.recoredCharLength(page.wrapper.textContent.length);
+				prevPage = page.wrapper;
 
-			yield breakToken;
+				this.recoredCharLength(page.wrapper.textContent.length);
 
-			// Stop if we get undefined, showing we have reached the end of the content
+				yield breakToken;
+
+				// Stop if we get undefined, showing we have reached the end of the content
+			}
 		}
-
 
 	}
 
@@ -515,6 +539,7 @@ class Chunker {
 		}
 
 		await this.hooks.afterPageLayout.trigger(page.element, page, undefined, this);
+		await this.hooks.finalizePage.trigger(page.element, page, undefined, this);
 		this.emit("renderedPage", page);
 	}
 

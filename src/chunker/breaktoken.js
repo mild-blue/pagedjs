@@ -1,27 +1,44 @@
+import {
+	isElement
+} from "../utils/dom.js";
+
+import Overflow from './overflow.js';
+
 /**
- * Layout
+ * BreakToken
  * @class
  */
 class BreakToken {
 
-	constructor(node, offset) {
+	constructor(node, overflowArray) {
 		this.node = node;
-		this.offset = offset;
+		this.overflow = overflowArray || [];
+		this.finished = false;
 	}
 
 	equals(otherBreakToken) {
-		if (!otherBreakToken) {
+		if (this.node !== otherBreakToken.node) {
 			return false;
 		}
-		if (this["node"] && otherBreakToken["node"] &&
-			this["node"] !== otherBreakToken["node"]) {
+
+		if (otherBreakToken.overflow.length !== this.overflow.length) {
 			return false;
 		}
-		if (this["offset"] && otherBreakToken["offset"] &&
-			this["offset"] !== otherBreakToken["offset"]) {
-			return false;
+
+		for (const index in this.overflow) {
+			if (!this.overflow[index].equals(otherBreakToken.overflow[index])) {
+				return false;
+			}
 		}
 		return true;
+	}
+
+	setFinished() {
+		this.finished = true;
+	}
+
+	isFinished() {
+		return this.finished;
 	}
 
 }

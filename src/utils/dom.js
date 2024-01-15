@@ -1,4 +1,6 @@
+import { getBoundingClientRect } from "./utils.js";
 export function isElement(node) {
+
 	return node && node.nodeType === 1;
 }
 
@@ -104,7 +106,7 @@ export function displayedElementAfter(node, limiter) {
 	let after = elementAfter(node, limiter);
 
 	while (after && after.dataset.undisplayed) {
-		after = elementAfter(after);
+		after = elementAfter(after, limiter);
 	}
 
 	return after;
@@ -114,7 +116,7 @@ export function displayedElementBefore(node, limiter) {
 	let before = elementBefore(node, limiter);
 
 	while (before && before.dataset.undisplayed) {
-		before = elementBefore(before);
+		before = elementBefore(before, limiter);
 	}
 
 	return before;
@@ -133,47 +135,226 @@ export function stackChildren(currentNode, stacked) {
 	return stack;
 }
 
-export function rebuildAncestors(node) {
+export function rebuildTableRow(node, alreadyRendered) {
+	let currentCol = 0, maxCols = 0, nextInitialColumn = 0;
+	const initialColumns = Array.from(node.children);
+	while (node.firstChild) {
+		node.firstChild.remove();
+	}
+
+	// Find the max number of columns.
+	let earlierRow = node.parentElement.children[0];
+	while (earlierRow && earlierRow !== node) {
+		if (earlierRow.children.length > maxCols) {
+			maxCols = earlierRow.children.length;
+		}
+		earlierRow = earlierRow.nextElementSibling;
+	}
+
+	// The next td to use in each tr.
+	// Doesn't take account of rowspans above that might make extra columns.
+	let rowOffsets = Array(maxCols).fill(0);
+
+	// Duplicate rowspans and our initial columns.
+	while (nextInitialColumn < initialColumns.length || currentCol < maxCols) {
+		let earlierRow = node.parentElement.children[0];
+		let earlierRowIndex = 0, earlierRowDistance = 0;
+		let rowspan, column;
+		// Find the nth column we'll duplicate (rowspan) or use.
+		while (earlierRow && earlierRow !== node) {
+			if (rowspan !== undefined) {
+				rowOffsets[earlierRowIndex]++;
+			}
+			else {
+				column = earlierRow.children[currentCol - rowOffsets[earlierRowIndex]];
+				if (column && column.rowSpan !== undefined) {
+					rowspan = column.rowSpan;
+				}
+			}
+			// If rowspan === 0 the entire remainder of the table row is used.
+			if (rowspan) {
+				// Tracking how many rows in the overflow.
+				rowspan--;
+				if (rowspan < 2) {
+					rowspan = undefined;
+				}
+			}
+			earlierRow = earlierRow.nextElementSibling;
+			earlierRowIndex++;
+		}
+
+		let destColumn;
+		if (rowspan !== undefined) {
+			destColumn = column.cloneNode(false);
+			// Adjust rowspan value.
+		  destColumn.rowSpan = !column.rowSpan ? 0 : rowspan;
+		} else {
+			// Fill the gap with the initial columns (if exists).
+			destColumn = column = initialColumns[nextInitialColumn++]?.cloneNode(false);
+			// The initial column can be undefined if the newly created table has less columns than the original table.
+			destColumn?.removeAttribute("rowspan");
+		}
+		if (column) {
+			if (alreadyRendered) {
+				let existing = findElement(column, alreadyRendered);
+				if (existing) {
+					column = existing;
+				}
+			}
+			let width = column.width || getBoundingClientRect(column).width;
+			if (!isNaN(width) && width) {
+				destColumn.setAttribute("width", width + "px");
+			}
+			if (destColumn) {
+				node.appendChild(destColumn);
+			}
+		}
+		currentCol++;
+	}
+}
+
+export function rebuildTree (node, fragment, alreadyRendered) {
+	let parent, ancestor;
+	let ancestors = [];
+	let added = [];
+	let dupSiblings = false;
+	let freshPage = !fragment;
+	let numListItems = 0;
+
+	if (!fragment) {
+		fragment = document.createDocumentFragment();
+	}
+
+	// Gather all ancestors
+	let element = node;
+
+	if (!isText(node)) {
+		ancestors.unshift(node);
+		if (node.tagName == "LI") {
+			numListItems++;
+		}
+	}
+	while (element.parentNode && element.parentNode.nodeType === 1) {
+		ancestors.unshift(element.parentNode);
+		if (element.parentNode.tagName == "LI") {
+			numListItems++;
+		}
+		element = element.parentNode;
+	}
+
+	for (var i = 0; i < ancestors.length; i++) {
+		ancestor = ancestors[i];
+
+		let container;
+		if (added.length) {
+			container = added[added.length - 1];
+		} else {
+			container = fragment;
+		}
+
+		if (ancestor.nodeName == 'TR') {
+			rebuildTableRow(ancestor, alreadyRendered);
+			container.appendChild(ancestor);
+		}
+		else if (dupSiblings) {
+			let sibling = ancestor.parentElement ? ancestor.parentElement.children[0] : ancestor;
+
+			while (sibling) {
+				let existing = findElement(sibling, container), siblingClone;
+				if (!existing) {
+					siblingClone = cloneNodeAncestor(sibling);
+					if (alreadyRendered) {
+						let originalElement = findElement(sibling, alreadyRendered);
+						if (originalElement) {
+							let width = originalElement.width || getBoundingClientRect(originalElement).width;
+							if (!isNaN(width) && width) {
+								siblingClone.setAttribute("width", width + "px");
+							}
+						}
+					}
+					container.appendChild(siblingClone);
+				}
+
+				if (sibling == ancestor) {
+					parent = siblingClone || existing;
+				}
+				sibling = sibling.nextElementSibling;
+			}
+		} else {
+			parent = findElement(ancestor, container);
+			if (!parent) {
+				parent = cloneNodeAncestor(ancestor);
+				if (alreadyRendered) {
+					let originalElement = findElement(ancestor, alreadyRendered);
+					if (originalElement) {
+						let width = originalElement.width || getBoundingClientRect(originalElement).width;
+						if (!isNaN(width) && width) {
+							parent.setAttribute("width", width + "px");
+						}
+
+						// Colgroup to clone?
+						Array.from(originalElement.children).forEach(child => {
+							if (child.tagName == 'COLGROUP') {
+								parent.append(child.cloneNode(true));
+							}
+						});
+					}
+				}
+				container.appendChild(parent);
+			}
+		}
+
+		dupSiblings = (ancestor.nodeName !== "TR" && ancestor.dataset.clonesiblings == true);
+		added.push(parent);
+
+		if (ancestor.tagName == "LI") {
+			numListItems--;
+		}
+
+		if (freshPage && (isText(node) || numListItems)) {
+			// Flag the first node on the page so we can suppress list styles on
+			// a continued item and list item numbers except the list one
+			// if an item number should be printed.
+			parent.dataset.suppressListStyle = true;
+		}
+	}
+
+	added = undefined;
+	return fragment;
+}
+
+function cloneNodeAncestor (node) {
+	let result = node.cloneNode(false);
+
+	result.setAttribute("data-split-from", result.getAttribute("data-ref"));
+
+	// This will let us split a table with multiple columns correctly.
+	node.setAttribute("data-split-to", result.getAttribute("data-ref"));
+
+	if (result.hasAttribute("id")) {
+		let dataID = result.getAttribute("id");
+		result.setAttribute("data-id", dataID);
+		result.removeAttribute("id");
+	}
+
+	// This is handled by css :not, but also tidied up here
+	if (result.hasAttribute("data-break-before")) {
+		result.removeAttribute("data-break-before");
+	}
+
+	if (result.hasAttribute("data-previous-break-after")) {
+		result.removeAttribute("data-previous-break-after");
+	}
+
+	return result;
+}
+
+export function rebuildAncestors (node) {
 	let parent, ancestor;
 	let ancestors = [];
 	let added = [];
 
 	let fragment = document.createDocumentFragment();
-
-	// Handle rowspan on table
-	if (node.nodeName === "TR") {
-		let previousRow = node.previousElementSibling;
-		let previousRowDistance = 1;
-		while (previousRow) {
-			// previous row has more columns, might indicate a rowspan.
-			if (previousRow.childElementCount > node.childElementCount) {
-				const initialColumns = Array.from(node.children);
-				while (node.firstChild) {
-					node.firstChild.remove();
-				}
-				let k = 0;
-				for (let j = 0; j < previousRow.children.length; j++) {
-					let column = previousRow.children[j];
-					if (column.rowSpan && column.rowSpan > previousRowDistance) {
-						const duplicatedColumn = column.cloneNode(true);
-						// Adjust rowspan value
-						duplicatedColumn.rowSpan = column.rowSpan - previousRowDistance;
-						// Add the column to the row
-						node.appendChild(duplicatedColumn);
-					} else {
-						// Fill the gap with the initial columns (if exists)
-						const initialColumn = initialColumns[k++];
-						// The initial column can be undefined if the newly created table has less columns than the original table
-						if (initialColumn) {
-							node.appendChild(initialColumn);
-						}
-					}
-				}
-			}
-			previousRow = previousRow.previousElementSibling;
-			previousRowDistance++;
-		}
-	}
 
 	// Gather all ancestors
 	let element = node;
@@ -242,7 +423,7 @@ export function split(bound, cutElement, breakAfter) {
 		}
 
 		// Create a fragment with rebuilt ancestors
-		let fragment = rebuildAncestors(cutElement);
+		let fragment = rebuildTree(cutElement);
 
 		// Clone cut
 		if (!breakAfter) {

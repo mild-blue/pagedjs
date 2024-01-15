@@ -3,26 +3,57 @@
 	<meta name="viewport" content="width=device-width">
 	<title>PagedJS Specs</title>
 
-	<link rel="stylesheet" type="text/css" href="../examples/assets/styles/moby-dick.css">
-	<style>
-		section {
-			margin-top: 40px;
-			column-width: 20vh;
-		}
-		section > ul > li {
-			list-style-type: none;
-		}
-		h1 {
-			margin-top: 40px;
-			text-decoration: underline;
-		}
-		h2, h3 {
-			text-align: left;
-		}
-		li {
-			break-inside: avoid;
-		}
-	</style>
+  <style>
+    body *, body * * {
+      box-sizing: border-box;
+    }
+    body {
+      font-size: 1.2em;
+      margin: 2em;
+      font-family: sans-serif;
+    }
+    h1,h2,h3 {
+      font-weight: 300;
+      margin:0;
+      margin-bottom: .5em;
+      margin-top: 1.3em;
+    }
+    h2 {
+      font-size: 1.2em;
+    }
+    section > ul {
+      display: flex; 
+      flex-wrap: wrap;
+      gap: 5ch;
+    }
+    section ul {
+      list-style-type: none;
+    }
+    section li > ul {
+      padding-left: 1ch;
+    }
+    section > ul > li > ul > li {
+      min-width: 40ch; 
+      margin-bottom: .3em;
+    }
+
+
+    li a {
+      color: #0da6ba;
+      /* text-decoration-color: ; */
+      text-underline-offset: 3px;
+    }
+
+    li a:hover {
+      color: black;
+      background: #dcf4f7;
+    }
+
+    ul ul {
+      border-left: 2px solid grey;
+      padding-top:0;
+    }
+  </style>
 
 </head>
 <body>
@@ -231,7 +262,7 @@
 			<li>
 				<h2>Position Fixed</h2>
 				<ul>
-					<li><a href="/Users/fchasen/Repos/pagedjs/position-fixed/position-fixed.html">Position Fixed</a></li>
+					<li><a href="position-fixed/position-fixed.html">Position Fixed</a></li>
 				</ul>
 			</li>
 			<li>
@@ -252,6 +283,7 @@
 					<li><a href="string/string-last.html">String Last</a></li>
 					<li><a href="string/string-multiple.html">String Multiple</a></li>
 					<li><a href="string/string-start.html">String Start</a></li>
+					<li><a href="string/string-attr.html">String Attr</a></li>
 				</ul>
 			</li>
 			<li>
@@ -272,6 +304,12 @@
 					<li><a href="target/target-counter/target-counter-single-colon.html">Target Counter Single Colon</a></li>
 					<li><a href="target/target-counter/target-counter.html">Target Counter</a></li>
 					<li><a href="target/target-text/target-text.html">Target Text</a></li>
+				</ul>
+			</li>
+			<li>
+				<h2>Widow / Orphans</h2>
+				<ul>
+					<li><a href="widows-orphans/widows-orphans.html">Widows/orphans</a></li>
 				</ul>
 			</li>
 			<li>
